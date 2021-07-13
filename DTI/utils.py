@@ -19,6 +19,7 @@ def read_csv(txt_path):
     txt_data = [data.split(',') for data in txt_data]
     return txt_data
 
+
 def export(fn):
     mod = sys.modules[fn.__module__]
     if hasattr(mod, '__all__'):

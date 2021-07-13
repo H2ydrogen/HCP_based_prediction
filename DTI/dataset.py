@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 from torch.nn import functional as F
-from utils import read_csv, export
+from DTI.utils import read_csv, export
 import os
 import numpy as np
 import logging
@@ -10,10 +10,12 @@ from PIL import Image
 import copy
 from DTI import cli
 import random
+import collections
 
 args = cli.create_parser().parse_args()
 
-#统计列表的元素个数
+
+# 统计列表的元素个数
 def count_list(alist):
     data = alist
     data_dict = {}
@@ -23,7 +25,7 @@ def count_list(alist):
 
 
 @export
-def HCP_S1200():
+def get_hcp_s1200():
     root_dir = args.data_path
     data = read_csv(os.path.join(root_dir, 'S1200_demographics_Restricted.csv'))
     data = [[line[0], line[1], line[8], line[10], line[12], line[22]] for line in data[1:]]
@@ -57,28 +59,70 @@ def HCP_S1200():
             data[i][5] = 1
         data[i][5] = int(data[i][5])
 
-    # check if data exist
+    # 检查对应的数据文件是否存在，如果存在，把文件名加进去
     for i in reversed(range(len(data))):
-        if not os.path.exists(
-                os.path.join(root_dir, 'UKF_2T_AtlasSpace', 'tracts_right_hemisphere', str(data[i][0])) + '.csv') or\
-           not os.path.exists(
-                os.path.join(root_dir, 'UKF_2T_AtlasSpace', 'tracts_left_hemisphere', str(data[i][0])) + '.csv') or\
-           not os.path.exists(
-                os.path.join(root_dir, 'UKF_2T_AtlasSpace', 'anatomical_tracts', str(data[i][0])) + '.csv') or\
-           not os.path.exists(
-                os.path.join(root_dir, 'UKF_2T_AtlasSpace', 'tracts_commissural', str(data[i][0])) + '.csv'):
+        file1 = os.path.join(root_dir, 'UKF_2T_AtlasSpace', 'anatomical_tracts', str(data[i][0]) + '.csv')
+        file2 = os.path.join(root_dir, 'UKF_2T_AtlasSpace', 'tracts_commissural', str(data[i][0]) + '.csv')
+        file3 = os.path.join(root_dir, 'UKF_2T_AtlasSpace', 'tracts_left_hemisphere', str(data[i][0]) + '.csv')
+        file4 = os.path.join(root_dir, 'UKF_2T_AtlasSpace', 'tracts_right_hemisphere', str(data[i][0]) + '.csv')
+        if os.path.exists(file1) and os.path.exists(file2) and os.path.exists(file3) and os.path.exists(file4):
+            data[i].append(file1)
+            data[i].append(file2)
+            data[i].append(file3)
+            data[i].append(file4)
+        else:
             data.pop(i)
 
-    # 统计数据集
-    for i in range(len(data[0])):
-        print(count_list([x[i] for x in data[1:]]))
-
     return {
-        'data': data,
-        'classes': ['COVID-19', 'Common', 'Normal'],
-        'folds': ['01.txt', '02.txt', '03.txt', '04.txt'],
+        'root_dir': root_dir,
+        'data_list': data
     }
 
-dataset = HCP_S1200()
+
+# 装数据集的iterator的对象，可以不断next()出数据(x,y)
+@export
+class CreateDataset(Dataset):
+    def __init__(self, dataset, usage):
+        self.root_dir = dataset['root_dir']
+        self.data_list = dataset['data_list']
+        self.fold_number = 10
+        if usage == 'train':
+            index = int(len(self.data_list) * (1.0 - 1.0 / self.fold_number))
+            self.data_list = self.data_list[:index]
+        elif usage == 'val':
+            index = int(len(self.data_list) * (1.0 - 1.0 / self.fold_number))
+            self.data_list = self.data_list[index:]
+
+        self.data_list = self.data_list[:20]
 
 
+    def __len__(self):
+        return len(self.data_list)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        x = read_csv(self.data_list[idx][-1])
+        x = [row[9] for row in x[1:]]
+        for i in reversed(range(len(x))):
+            if not is_number(x[i]) or not float(x[i]) < 9999999:  # 排除nan
+                x[i] = 0
+            else:
+                x[i] = float(x[i])
+
+        return {
+            'x': torch.tensor(x),
+            'y': self.data_list[idx][1]
+        }
+
+
+# 判断一个字符串是否为数字
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        pass
+
+    return False

@@ -51,11 +51,14 @@ class HARmodel(nn.Module):
         # Extract features, 1D conv layers
         self.features = nn.Sequential(
             nn.Conv1d(input_channel, 64, 5),
+            nn.BatchNorm1d(64, momentum=0.5),
             nn.ReLU(),
             nn.Dropout(),
             nn.Conv1d(64, 64, 5),
+            nn.BatchNorm1d(64, momentum=0.5),
             nn.ReLU(),
             nn.Dropout(),
+            nn.BatchNorm1d(64, momentum=0.5),
             nn.Conv1d(64, 64, 5),
             nn.ReLU(),
         )
@@ -63,6 +66,7 @@ class HARmodel(nn.Module):
         self.classifier = nn.Sequential(
             nn.Dropout(),
             nn.Linear(50432, 128),
+            nn.BatchNorm1d(128, momentum=0.5),
             nn.ReLU(),
             nn.Dropout(),
             nn.Linear(128, num_classes),

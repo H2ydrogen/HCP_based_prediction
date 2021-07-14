@@ -29,7 +29,7 @@ def main():
     # model = models.CNN(800, 2).to(device)
     # if args.MODEL == '1D-CNN':
     model = models.HARmodel(1, 2).to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.002)
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.LR)
 
     # 训练
     val_loss = []
@@ -38,6 +38,9 @@ def main():
     train_acc = []
     val_precision = []
     val_recall = []
+
+    # 打印训练信息
+    LOG.info("Args:{}".format(args))
 
     for epoch in range(args.epochs):
         train_results = train(train_loader, model, optimizer, epoch)
@@ -61,8 +64,8 @@ def main():
     f.writelines('val_precision' + str(val_precision)+'\n')
     f.writelines('val_recall' + str(val_recall)+'\n')
     f.close()
-
     LOG.info("--- main.py finish in %s seconds ---" % (time.time() - start_time))
+
 
 def train(dataloader, model, optimizer, epoch):
     model.train()
@@ -97,8 +100,8 @@ def train(dataloader, model, optimizer, epoch):
                      train_correct / len(dataloader.dataset)))
 
     return {
-        'train_loss': train_loss,
-        'train_acc': train_correct / len(dataloader.dataset)
+        'train_loss': round(train_loss.tolist(), 4),
+        'train_acc': round(train_correct / len(dataloader.dataset), 4)
     }
 
 
@@ -128,12 +131,13 @@ def validation(model, val_loader):
             pred_list = np.append(pred_list, pred.cpu().numpy())
             target_list = np.append(target_list, y)
 
-            val_result = analyse.analyse_3class(target_list, pred_list)
+    LOG.info("--- validation epoch finish in %s seconds --- Loss:{}\tCorrect:{}/{}({})"
+             .format(time.time() - start_time, test_loss, correct, len(val_loader.dataset), correct / len(val_loader.dataset)))
+    val_result = analyse.analyse_3class(target_list, pred_list)
 
-    LOG.info("--- validation epoch finish in %s seconds ---" % (time.time() - start_time))
     return {
-        'val_loss': test_loss,
-        'val_acc': test_loss / len(val_loader.dataset),
+        'val_loss': round(test_loss.cpu().numpy().tolist(), 4),
+        'val_acc': round(correct / len(val_loader.dataset), 4),
         'val_precision': val_result['precision'],
         'val_recall': val_result['recall'],
     }

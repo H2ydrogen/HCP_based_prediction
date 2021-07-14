@@ -13,6 +13,7 @@ import random
 import collections
 
 args = cli.create_parser().parse_args()
+LOG = logging.getLogger('dataset')
 
 
 # 统计列表的元素个数
@@ -106,8 +107,16 @@ class CreateDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        x = read_csv(self.data_list[idx][-1])
-        x = [row[10] for row in x[1:]]
+        data = read_csv(self.data_list[idx][-1])
+        if 'FA1-mean' == args.INPUT_FEATURES:
+            x = [row[10] for row in data[1:]]
+        if 'FA2-mean' == args.INPUT_FEATURES:
+            x = [row[16] for row in data[1:]]
+        if 'Trace1-mean' == args.INPUT_FEATURES:
+            x = [row[34] for row in data[1:]]
+        if 'Trace2-mean' == args.INPUT_FEATURES:
+            x = [row[40] for row in data[1:]]
+
         for i in reversed(range(len(x))):
             if not float(x[i]) < 9999999:  # 排除nan
                 x[i] = 0

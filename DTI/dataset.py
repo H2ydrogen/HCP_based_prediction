@@ -73,6 +73,10 @@ def get_hcp_s1200():
         else:
             data.pop(i)
 
+    #  统计数据集
+    # print(count_list([x[2] for x in data[1:]]))
+    # print(count_list([x[7] for x in data[1:]]))
+
     return {
         'root_dir': root_dir,
         'data_list': data
@@ -93,8 +97,7 @@ class CreateDataset(Dataset):
             index = int(len(self.data_list) * (1.0 - 1.0 / self.fold_number))
             self.data_list = self.data_list[index:]
 
-        self.data_list = self.data_list[:20]
-
+        self.data_list = self.data_list
 
     def __len__(self):
         return len(self.data_list)
@@ -104,16 +107,16 @@ class CreateDataset(Dataset):
             idx = idx.tolist()
 
         x = read_csv(self.data_list[idx][-1])
-        x = [row[9] for row in x[1:]]
+        x = [row[10] for row in x[1:]]
         for i in reversed(range(len(x))):
-            if not is_number(x[i]) or not float(x[i]) < 9999999:  # 排除nan
+            if not float(x[i]) < 9999999:  # 排除nan
                 x[i] = 0
             else:
                 x[i] = float(x[i])
 
         return {
             'x': torch.tensor(x),
-            'y': self.data_list[idx][1]
+            'y': self.data_list[idx][2]
         }
 
 

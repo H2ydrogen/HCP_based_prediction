@@ -108,24 +108,41 @@ class CreateDataset(Dataset):
             idx = idx.tolist()
 
         data = read_csv(self.data_list[idx][-1])
+        if 'Num_Fibers' == args.INPUT_FEATURES:
+            x = [row[2] for row in data[1:]]
         if 'FA1-mean' == args.INPUT_FEATURES:
             x = [row[10] for row in data[1:]]
         if 'FA2-mean' == args.INPUT_FEATURES:
             x = [row[16] for row in data[1:]]
         if 'Trace1-mean' == args.INPUT_FEATURES:
-            x = [row[34] for row in data[1:]]
+            x = [row[30] for row in data[1:]]
         if 'Trace2-mean' == args.INPUT_FEATURES:
-            x = [row[40] for row in data[1:]]
+            x = [row[34] for row in data[1:]]
+        if '4' == args.INPUT_FEATURES:
+            x = [[row[2], row[10], row[16], row[34]] for row in data[1:]]
+        if 'All' == args.INPUT_FEATURES:
+            x = [row[34] for row in data[1:]]
 
         for i in reversed(range(len(x))):
-            if not float(x[i]) < 9999999:  # 排除nan
-                x[i] = 0
+            if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
+                if not float(x[i]) < 9999999:  # 排除nan
+                    x[i] = 0
+                else:
+                    x[i] = float(x[i])
             else:
-                x[i] = float(x[i])
+                for j, num in enumerate(x[i]):
+                    if not float(x[i][j]) < 999999:  # 排除nan
+                        x[i][j] = 0
+                    else:
+                        x[i][j] = float(x[i][j])
+        if args.OUTPUT_FEATURES == 'sex':
+            y = self.data_list[idx][2]
+        elif args.OUTPUT_FEATURES == 'race':
+            y = self.data_list[idx][3]
 
         return {
             'x': torch.tensor(x),
-            'y': self.data_list[idx][2]
+            'y': y
         }
 
 

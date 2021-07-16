@@ -8,8 +8,8 @@ import torch.backends.cudnn as cudnn
 import torch
 import torch.nn.functional as functional
 import numpy as np
-import copy
 from DTI import models, dataset, cli, utils, analyse
+import os
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
@@ -26,9 +26,13 @@ def main():
                             num_workers=args.num_workers)
 
     # 网络加载
-    # model = models.CNN(800, 2).to(device)
     # if args.MODEL == '1D-CNN':
-    model = models.HARmodel(1, 2).to(device)
+    if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
+        model = models.HARmodel(1, args.NUM_CLASSES).to(device)
+    else:
+        model = models.HARmodel(4, args.NUM_CLASSES).to(device)
+    if os.path.exists(args.LOAD_PATH):
+        model.load_state_dict(torch.load(args.LOAD_PATH))
     optimizer = torch.optim.SGD(model.parameters(), lr=args.LR)
 
     # 训练
@@ -55,6 +59,7 @@ def main():
         val_recall.append(val_results['val_recall'])
 
     # 训练结果存档
+    torch.save(model.state_dict(), '.\\LOG\\{}.pkl'.format(time.strftime("%Y%m%d-%H%M%S", time.localtime())))
     f = open(args.RECORD_PATH, 'a+')
     f.writelines('args'+str(args)+'\n')
     f.writelines('train_loss'+str(train_loss)+'\n')
@@ -75,7 +80,10 @@ def train(dataloader, model, optimizer, epoch):
     for batch_index, batch_samples in enumerate(dataloader):
         # 1.load data to CUDA
         x, y = batch_samples['x'].to(device), batch_samples['y'].to(device)
-        x = x.unsqueeze(1)
+        if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
+            x = x.unsqueeze(1)
+        else:
+            x = x.transpose(1, 2)
 
         # 2.forward
         output = model(x)
@@ -116,7 +124,10 @@ def validation(model, val_loader):
         for batch_index, batch_samples in enumerate(val_loader):
             #  1.load data to CUDA
             x, y = batch_samples['x'].to('cuda'), batch_samples['y'].to('cuda')
-            x = x.unsqueeze(1)
+            if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
+                x = x.unsqueeze(1)
+            else:
+                x = x.transpose(2, 1)
 
             # 2.forward
             output = model(x)
@@ -131,7 +142,7 @@ def validation(model, val_loader):
             pred_list = np.append(pred_list, pred.cpu().numpy())
             target_list = np.append(target_list, y)
 
-    LOG.info("--- validation epoch finish in %s seconds --- Loss:{}\tCorrect:{}/{}({})"
+    LOG.info("--- validation epoch finish in {} seconds --- Loss:{}\tCorrect:{}/{}({})"
              .format(time.time() - start_time, test_loss, correct, len(val_loader.dataset), correct / len(val_loader.dataset)))
     val_result = analyse.analyse_3class(target_list, pred_list)
 

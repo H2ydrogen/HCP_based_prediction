@@ -1,5 +1,6 @@
 # simple implementation of CAM in PyTorch for the networks such as ResNet, DenseNet, SqueezeNet, Inception
 # last update by BZ, June 30, 2021
+# modified by Hao, Jul 16, 2021
 
 import io
 from PIL import Image
@@ -12,7 +13,7 @@ import cv2
 import json
 
 # input image
-LABELS_file = 'test_label.json'
+LABELS_file = 'test_label.csv'
 image_file = 'test.jpg'
 
 # networks such as googlenet, resnet, densenet already use global average pooling at the end, so CAM could be used directly.

@@ -40,7 +40,7 @@ net._modules.get(finalconv_name).register_forward_hook(hook_feature)
 
 # get the softmax weight
 params = list(net.parameters())
-weight_softmax = np.squeeze(params[-2].data.numpy())
+weight_softmax = np.squeeze(params[-2].data.numpy())  # 取出最后一层linear的w系数
 
 def returnCAM(feature_conv, weight_softmax, class_idx):
     # generate the class activation maps upsample to 256x256
@@ -48,7 +48,9 @@ def returnCAM(feature_conv, weight_softmax, class_idx):
     bz, nc, h, w = feature_conv.shape
     output_cam = []
     for idx in class_idx:
-        cam = weight_softmax[idx].dot(feature_conv.reshape((nc, h*w)))
+        linear = weight_softmax[idx]
+        feature = feature_conv.reshape((nc, h*w))
+        cam = linear.dot(feature)
         cam = cam.reshape(h, w)
         cam = cam - np.min(cam)
         cam_img = cam / np.max(cam)

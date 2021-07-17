@@ -22,15 +22,23 @@ def main():
     val_set = dataset.CreateDataset(dataset.get_hcp_s1200(), usage='val')
     train_loader = DataLoader(train_set, batch_size=args.batch_size, drop_last=False, shuffle=True, pin_memory=True,
                               num_workers=args.num_workers)
-    val_loader = DataLoader(val_set, batch_size=args.batch_size, drop_last=False, shuffle=True, pin_memory=True,
+    val_loader = DataLoader(val_set, batch_size=args.batch_size, drop_last=True, shuffle=True, pin_memory=True,
                             num_workers=args.num_workers)
 
     # 网络加载
     # if args.MODEL == '1D-CNN':
     if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
-        model = models.HARmodel(1, args.NUM_CLASSES).to(device)
+        c = 1
     else:
-        model = models.HARmodel(4, args.NUM_CLASSES).to(device)
+        c = 4
+
+    if args.MODEL == '1D-CNN':
+        model = models.HARmodel(c, args.NUM_CLASSES).to(device)
+    elif args.MODEL == 'CAM-CNN':
+        model = models.CAM_CNN(c, args.NUM_CLASSES).to(device)
+    else:
+        model = None
+
     if os.path.exists(args.LOAD_PATH):
         model.load_state_dict(torch.load(args.LOAD_PATH))
     optimizer = torch.optim.SGD(model.parameters(), lr=args.LR)

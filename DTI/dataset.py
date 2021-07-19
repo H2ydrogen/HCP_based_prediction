@@ -108,6 +108,7 @@ class CreateDataset(Dataset):
             idx = idx.tolist()
 
         data = read_csv(self.data_list[idx][-1])
+
         data = np.array([row[1:] for row in data[1:]]).astype(np.float).transpose()  # np.size()=(38,800)
         x = np.zeros((1, 800))
 

@@ -34,21 +34,11 @@ def main():
 
     if args.MODEL == '1D-CNN':
         model = models.HARmodel(c, args.NUM_CLASSES).to(device)
-<<<<<<< HEAD
     else:
         model = None
 
     # if os.path.exists(args.LOAD_PATH):
     #     model.load_state_dict(torch.load(args.LOAD_PATH))
-=======
-    elif args.MODEL == 'CAM-CNN':
-        model = models.CAM_CNN(c, args.NUM_CLASSES).to(device)
-    else:
-        model = None
-
-    if os.path.exists(args.LOAD_PATH):
-        model.load_state_dict(torch.load(args.LOAD_PATH))
->>>>>>> refs/remotes/origin/master
     optimizer = torch.optim.SGD(model.parameters(), lr=args.LR)
 
     # 训练
@@ -95,24 +85,12 @@ def train(dataloader, model, optimizer, epoch):
     start_time = time.time()
     for batch_index, batch_samples in enumerate(dataloader):
         # 1.load data to CUDA
-<<<<<<< HEAD
         x, y = batch_samples['x'].to(device), batch_samples['y'].to(device)  # x.size = (bs,C, len); y.size = (bs)
 
         # 2.forward
         criteria = nn.CrossEntropyLoss()
         output = model(x)  # output.size = (bs, 3)
         # score = functional.softmax(output, dim=1)
-=======
-        x, y = batch_samples['x'].to(device), batch_samples['y'].to(device)
-        if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
-            x = x.unsqueeze(1)
-        else:
-            x = x.transpose(1, 2)
-
-        # 2.forward
-        output = model(x)
-        criteria = nn.CrossEntropyLoss()
->>>>>>> refs/remotes/origin/master
         loss = criteria(output, y.long())
 
         # 3.backward
@@ -149,13 +127,6 @@ def validation(model, val_loader):
         for batch_index, batch_samples in enumerate(val_loader):
             #  1.load data to CUDA
             x, y = batch_samples['x'].to('cuda'), batch_samples['y'].to('cuda')
-<<<<<<< HEAD
-=======
-            if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
-                x = x.unsqueeze(1)
-            else:
-                x = x.transpose(2, 1)
->>>>>>> refs/remotes/origin/master
 
             # 2.forward
             output = model(x)

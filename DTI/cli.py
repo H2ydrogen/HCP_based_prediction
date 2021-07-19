@@ -19,11 +19,11 @@ def create_parser():
     parser.add_argument('--MODEL', default=['1D-CNN', ''][0], type=str)
     parser.add_argument('--LOAD_PATH', default='.\\LOG\\20210716-202835.pkl', type=str)
     # training
-    parser.add_argument('--epochs', default=500, type=int)
-    parser.add_argument('--batch-size', default=64, type=int)
+    parser.add_argument('--epochs', default=600, type=int)
+    parser.add_argument('--batch-size', default=32, type=int)
     parser.add_argument('--num-workers', default=4, type=int)
-    parser.add_argument('--display-batch', default=1, type=int)
-    parser.add_argument('--LR', default=0.1, type=float)
+    parser.add_argument('--display-batch', default=50, type=int)
+    parser.add_argument('--LR', default=0.001, type=float)
     # record
     parser.add_argument('--RECORD-PATH', default='.\\LOG\\{}.txt'.format(time.strftime("%Y%m%d-%H%M%S", time.localtime())), type=str)
 

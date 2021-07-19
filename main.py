@@ -90,8 +90,8 @@ def train(dataloader, model, optimizer, epoch):
         # 2.forward
         criteria = nn.CrossEntropyLoss()
         output = model(x)  # output.size = (bs, 3)
-        # score = functional.softmax(output, dim=1)
-        loss = criteria(output, y.long())
+        score = functional.softmax(output, dim=1)
+        loss = criteria(score, y.long())
 
         # 3.backward
         optimizer.zero_grad()  # 把所有Variable的grad成员数值变为0

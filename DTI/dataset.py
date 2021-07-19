@@ -119,9 +119,9 @@ class CreateDataset(Dataset):
         if 'FA2-mean' in args.INPUT_FEATURES:
             x = np.concatenate((x, data[15, :][None]))
         if 'Trace1-mean' in args.INPUT_FEATURES:
-            x = np.concatenate((x, data[29, :][None]))
+            x = np.concatenate((x, data[27, :][None])) * 1000
         if 'Trace2-mean' in args.INPUT_FEATURES:
-            x = np.concatenate((x, data[33, :][None]))
+            x = np.concatenate((x, data[33, :][None])) * 1000
         x = x[1:]
         x[~(x > -999999)] = 0
 
@@ -133,11 +133,75 @@ class CreateDataset(Dataset):
         elif args.OUTPUT_FEATURES == 'race':
             y = self.data_list[idx][3]
 
+
         return {
-            'x': torch.from_numpy(x),  # size:
+            'x': torch.from_numpy(x).float(),  # size:
             'y': torch.tensor(y)
         }
 
+
+# # 装数据集的iterator的对象，可以不断next()出数据(x,y)
+# @export
+# class CreateDataset(Dataset):
+#     def __init__(self, dataset, usage):
+#         self.root_dir = dataset['root_dir']
+#         self.data_list = dataset['data_list']
+#         self.fold_number = 10
+#         if usage == 'train':
+#             index = int(len(self.data_list) * (1.0 - 1.0 / self.fold_number))
+#             self.data_list = self.data_list[:index]
+#         elif usage == 'val':
+#             index = int(len(self.data_list) * (1.0 - 1.0 / self.fold_number))
+#             self.data_list = self.data_list[index:]
+#
+#         self.data_list = self.data_list
+#
+#     def __len__(self):
+#         return len(self.data_list)
+#
+#     def __getitem__(self, idx):
+#         if torch.is_tensor(idx):
+#             idx = idx.tolist()
+#
+#         data = read_csv(self.data_list[idx][-1])
+#         if 'Num_Fibers' == args.INPUT_FEATURES:
+#             x = [row[2] for row in data[1:]]
+#         if 'FA1-mean' == args.INPUT_FEATURES:
+#             x = [row[10] for row in data[1:]]
+#         if 'FA2-mean' == args.INPUT_FEATURES:
+#             x = [row[16] for row in data[1:]]
+#         if 'Trace1-mean' == args.INPUT_FEATURES:
+#             x = [row[30] for row in data[1:]]
+#         if 'Trace2-mean' == args.INPUT_FEATURES:
+#             x = [row[34] for row in data[1:]]
+#         if '4' == args.INPUT_FEATURES:
+#             x = [[row[2], row[10], row[16], row[34]] for row in data[1:]]
+#         if 'All' == args.INPUT_FEATURES:
+#             x = [row[34] for row in data[1:]]
+#
+#         for i in reversed(range(len(x))):
+#             if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
+#                 if not float(x[i]) < 9999999:  # 排除nan
+#                     x[i] = 0
+#                 else:
+#                     x[i] = float(x[i])
+#             else:
+#                 for j, num in enumerate(x[i]):
+#                     if not float(x[i][j]) < 999999:  # 排除nan
+#                         x[i][j] = 0
+#                     else:
+#                         x[i][j] = float(x[i][j])
+#         if args.OUTPUT_FEATURES == 'sex':
+#             y = self.data_list[idx][2]
+#         elif args.OUTPUT_FEATURES == 'race':
+#             y = self.data_list[idx][3]
+#
+#         x = torch.tensor(x)
+#         a = 0
+#         return {
+#             'x': 0,
+#             'y': y
+#         }
 
 # 判断一个字符串是否为数字
 def is_number(s):

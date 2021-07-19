@@ -1,0 +1,7 @@
+argsNamespace(FEATURES_TYPE=['right-hemisphere'], INPUT_FEATURES=['FA1-mean'], MODEL='1D-CNN', RECORD_PATH='.\\LOG\\20210714-223307.txt', batch_size=64, data_path='D:\\Datasets\\HCP_S1200', display_batch=10, epochs=1, num_workers=4)
+train_loss[9.777]
+train_acc[0.4482]
+val_loss[1.3882]
+val_acc[0.4948]
+val_precision[[0.4948, nan]]
+val_recall[[1.0, 0.0]]

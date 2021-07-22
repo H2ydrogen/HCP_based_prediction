@@ -24,36 +24,34 @@ def main():
                         num_workers=args.num_workers)
 
     # 网络加载
-    if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
-        c = 1
-    else:
-        c = 4
     if args.MODEL == '1D-CNN':
-        model = models.HARmodel(c, args.NUM_CLASSES).to(device)
+        model = models.HARmodel(len(args.INPUT_FEATURES), args.NUM_CLASSES).to(device)
     else:
         model = None
-    # model.load_state_dict(torch.load(args.LOAD_PATH))
+    model.load_state_dict(torch.load(args.LOAD_PATH))
     model.eval()
 
     # 训练
 
     # 开始验证
     LOG.info("Args:{}".format(args))
-    drop, idx = validation(model, loader)[1:].sort(0, True)
+    drop, idx = validation(model, loader).sort(0, True)
     drop = drop.numpy().tolist()
     idx = idx.numpy().tolist()
 
     # 结果存档
     f = open('.\\LOG\\rank\\Occ{}.csv'.format(time.strftime("%Y%m%d-%H%M%S", time.localtime())), 'a+')
     for i in range(len(idx)):
-        f.writelines(str(idx[i]) + ',' + str(drop[i]) + '\n')
+        f.writelines('cluster_'+str(idx[i]+1) + ',' + str(drop[i]) + '\n')
     f.close()
     LOG.info("--- Occ.py finish in %s seconds ---" % (time.time() - start_time))
 
 
 def validation(model, val_loader):
+    start_time = time.time()
     drop = torch.zeros(801)
     num_sample = 0
+    correct = 0
     with torch.no_grad():
         for batch_index, batch_samples in enumerate(val_loader):
             #
@@ -64,8 +62,9 @@ def validation(model, val_loader):
             score = functional.softmax(output, dim=1)
             conf = torch.max(score, dim=1).values
             pred = output.argmax(dim=1, keepdim=True)
-
+            correct += pred.eq(y.view_as(pred)).sum().item()
             confidence_drop = torch.zeros(1)
+            # 遍历这组样本的每一个cluster
             for cluster in range(800):
                 x_new = x.clone()
                 for i in range(0, 1):
@@ -79,8 +78,12 @@ def validation(model, val_loader):
             if batch_index % args.display_batch == 0:
                 LOG.info("--- training progress rate {}/{} ---".format(batch_index, len(val_loader)))
 
+    LOG.info("--- validation epoch finish in {} seconds --- Correct:{}/{}({})"
+             .format(time.time() - start_time, correct, len(val_loader.dataset),
+                     correct / len(val_loader.dataset)))
+
     drop_mean = drop / num_sample
-    return drop_mean
+    return drop_mean[1:]
 
 
 if __name__ == '__main__':

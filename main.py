@@ -26,14 +26,9 @@ def main():
                             num_workers=args.num_workers)
 
     # 网络加载
-    # if args.MODEL == '1D-CNN':
-    if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
-        c = 1
-    else:
-        c = 4
 
     if args.MODEL == '1D-CNN':
-        model = models.HARmodel(c, args.NUM_CLASSES).to(device)
+        model = models.HARmodel(len(args.INPUT_FEATURES), args.NUM_CLASSES).to(device)
     else:
         model = None
 
@@ -65,8 +60,8 @@ def main():
         val_recall.append(val_results['val_recall'])
 
     # 训练结果存档
-    torch.save(model.state_dict(), '.\\LOG\\{}.pkl'.format(time.strftime("%Y%m%d-%H%M%S", time.localtime())))
-    f = open(args.RECORD_PATH, 'a+')
+    torch.save(model.state_dict(), '.\\LOG\\{}.pkl'.format(args.RECORD_NAME))
+    f = open('.\\LOG\\{}.txt'.format(args.RECORD_NAME), 'a+')
     f.writelines('args'+str(args)+'\n')
     f.writelines('train_loss'+str(train_loss)+'\n')
     f.writelines('train_acc' + str(train_acc)+'\n')
@@ -90,8 +85,8 @@ def train(dataloader, model, optimizer, epoch):
         # 2.forward
         criteria = nn.CrossEntropyLoss()
         output = model(x)  # output.size = (bs, 3)
-        score = functional.softmax(output, dim=1)
-        loss = criteria(score, y.long())
+        # score = functional.softmax(output, dim=1)
+        loss = criteria(output, y.long())
 
         # 3.backward
         optimizer.zero_grad()  # 把所有Variable的grad成员数值变为0

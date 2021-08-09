@@ -74,13 +74,16 @@ def get_hcp_s1200():
         else:
             data.pop(i)
 
+    transform = transforms.Normalize(mean=0.05, std=0.5)  # mean 和 std是数据集的均值和方差，
+
     #  统计数据集
     # print(count_list([x[2] for x in data[1:]]))
     # print(count_list([x[7] for x in data[1:]]))
 
     return {
         'root_dir': root_dir,
-        'data_list': data
+        'data_list': data,
+        'transform': transform
     }
 
 
@@ -90,7 +93,8 @@ class CreateDataset(Dataset):
     def __init__(self, dataset, usage):
         self.root_dir = dataset['root_dir']
         self.data_list = dataset['data_list']
-        self.fold_number = 10
+        self.transform = dataset['transform']
+        self.fold_number = args.FOLD_NUM
         if usage == 'train':
             index = int(len(self.data_list) * (1.0 - 1.0 / self.fold_number))
             self.data_list = self.data_list[:index]
@@ -107,101 +111,62 @@ class CreateDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        data = read_csv(self.data_list[idx][-1])
+        data = []
+        # print('sample:'+self.data_list[idx][0]+'\t'+str(idx))
+        if 'right-hemisphere' in args.FEATURES_TYPE:
+            data.append(read_csv(self.data_list[idx][-1]))
+        if 'left-hemisphere' in args.FEATURES_TYPE:
+            data.append(read_csv(self.data_list[idx][-2]))
+        if 'commissural' in args.FEATURES_TYPE:
+            data.append(read_csv(self.data_list[idx][-3]))
+        if 'anatomical' in args.FEATURES_TYPE:
+            raise
 
-        data = np.array([row[1:] for row in data[1:]]).astype(np.float).transpose()  # np.size()=(38,800)
-        x = np.zeros((1, 800))
+        all_data = np.zeros((38, 1))
+        for element in data:
+            element = np.array([row[1:] for row in element[1:]]).astype(np.float).transpose()  # np.size()=(num_features,num_clu)
+            all_data = np.concatenate((all_data, element), axis=1)
+        all_data = all_data[:, 1:]
+        x = np.zeros((1, all_data.shape[1]))
 
         if 'Num_Fibers' in args.INPUT_FEATURES:
-            x = np.concatenate((x, data[1, :][None]))
+            feature = all_data[1, :][None]
+            x = np.concatenate((x, feature))
         if 'FA1-mean' in args.INPUT_FEATURES: # row[10]
-            x = np.concatenate((x, data[9, :][None]))
+            x = np.concatenate((x, all_data[9, :][None]))
+        if 'FA1-max' in args.INPUT_FEATURES:  # row[9]
+            x = np.concatenate((x, all_data[8, :][None]))
+        if 'FA1-min' in args.INPUT_FEATURES:  # row[12]
+            x = np.concatenate((x, all_data[11, :][None]))
         if 'FA2-mean' in args.INPUT_FEATURES:
-            x = np.concatenate((x, data[15, :][None]))
+            x = np.concatenate((x, all_data[15, :][None]))
         if 'Trace1-mean' in args.INPUT_FEATURES:
-            x = np.concatenate((x, data[27, :][None])) * 1000
+            x = np.concatenate((x, all_data[27, :][None])) * 1000
         if 'Trace2-mean' in args.INPUT_FEATURES:
-            x = np.concatenate((x, data[33, :][None])) * 1000
+            x = np.concatenate((x, all_data[33, :][None])) * 1000
+        if 'Trace1-mean' in args.INPUT_FEATURES:
+            x = np.concatenate((x, all_data[27, :][None])) * 1000
+        if 'Trace2-mean' in args.INPUT_FEATURES:
+            x = np.concatenate((x, all_data[33, :][None])) * 1000
         x = x[1:]
-        x[~(x > -999999)] = 0
+        x[~(x > -999999)] = 0  # 将nan转换为0
+        max = x.max()
+        x = (x-x.min())/(x.max()-x.min())
 
-        if 'All' in args.INPUT_FEATURES:
-            x = data
+        # np->tensor, 数据normalization
+        x = torch.from_numpy(x).float()
 
         if args.OUTPUT_FEATURES == 'sex':
             y = self.data_list[idx][2]
         elif args.OUTPUT_FEATURES == 'race':
             y = self.data_list[idx][3]
 
-
         return {
-            'x': torch.from_numpy(x).float(),  # size:
+            'x': x,  # size:(1,num_features)
             'y': torch.tensor(y)
         }
 
 
-# # 装数据集的iterator的对象，可以不断next()出数据(x,y)
-# @export
-# class CreateDataset(Dataset):
-#     def __init__(self, dataset, usage):
-#         self.root_dir = dataset['root_dir']
-#         self.data_list = dataset['data_list']
-#         self.fold_number = 10
-#         if usage == 'train':
-#             index = int(len(self.data_list) * (1.0 - 1.0 / self.fold_number))
-#             self.data_list = self.data_list[:index]
-#         elif usage == 'val':
-#             index = int(len(self.data_list) * (1.0 - 1.0 / self.fold_number))
-#             self.data_list = self.data_list[index:]
-#
-#         self.data_list = self.data_list
-#
-#     def __len__(self):
-#         return len(self.data_list)
-#
-#     def __getitem__(self, idx):
-#         if torch.is_tensor(idx):
-#             idx = idx.tolist()
-#
-#         data = read_csv(self.data_list[idx][-1])
-#         if 'Num_Fibers' == args.INPUT_FEATURES:
-#             x = [row[2] for row in data[1:]]
-#         if 'FA1-mean' == args.INPUT_FEATURES:
-#             x = [row[10] for row in data[1:]]
-#         if 'FA2-mean' == args.INPUT_FEATURES:
-#             x = [row[16] for row in data[1:]]
-#         if 'Trace1-mean' == args.INPUT_FEATURES:
-#             x = [row[30] for row in data[1:]]
-#         if 'Trace2-mean' == args.INPUT_FEATURES:
-#             x = [row[34] for row in data[1:]]
-#         if '4' == args.INPUT_FEATURES:
-#             x = [[row[2], row[10], row[16], row[34]] for row in data[1:]]
-#         if 'All' == args.INPUT_FEATURES:
-#             x = [row[34] for row in data[1:]]
-#
-#         for i in reversed(range(len(x))):
-#             if args.INPUT_FEATURES != '4' and args.INPUT_FEATURES != 'all':
-#                 if not float(x[i]) < 9999999:  # 排除nan
-#                     x[i] = 0
-#                 else:
-#                     x[i] = float(x[i])
-#             else:
-#                 for j, num in enumerate(x[i]):
-#                     if not float(x[i][j]) < 999999:  # 排除nan
-#                         x[i][j] = 0
-#                     else:
-#                         x[i][j] = float(x[i][j])
-#         if args.OUTPUT_FEATURES == 'sex':
-#             y = self.data_list[idx][2]
-#         elif args.OUTPUT_FEATURES == 'race':
-#             y = self.data_list[idx][3]
-#
-#         x = torch.tensor(x)
-#         a = 0
-#         return {
-#             'x': 0,
-#             'y': y
-#         }
 
 # 判断一个字符串是否为数字
 def is_number(s):

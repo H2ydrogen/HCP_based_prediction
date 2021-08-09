@@ -9,12 +9,12 @@ import torch
 import torch.nn.functional as functional
 import numpy as np
 from DTI import models, dataset, cli, utils, analyse
-import os
+import operator
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
 def main():
-    utils.setup_seed(18)
+    utils.setup_seed(123)
     start_time = time.time()
 
     # 数据集加载
@@ -34,7 +34,7 @@ def main():
 
     # if os.path.exists(args.LOAD_PATH):
     #     model.load_state_dict(torch.load(args.LOAD_PATH))
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.LR)
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.LR, weight_decay=0.01)
 
     # 训练
     val_loss = []
@@ -59,6 +59,13 @@ def main():
         val_precision.append(val_results['val_precision'])
         val_recall.append(val_results['val_recall'])
 
+        # 打印最好成绩
+        max_train_acc_index, max_train_acc = max(enumerate(train_acc), key=operator.itemgetter(1))
+        max_val_acc_index, max_val_acc = max(enumerate(val_acc), key=operator.itemgetter(1))
+        min_train_loss_index, min_train_loss = min(enumerate(train_loss), key=operator.itemgetter(1))
+        print('best train_loss；{}({}epoch)---best t_acc:{}({}epoch)---best val_acc；{}({}epoch),'
+              .format(min_train_loss, min_train_loss_index+1, max_train_acc, max_train_acc_index+1, max_val_acc, max_val_acc_index+1,))
+
     # 训练结果存档
     torch.save(model.state_dict(), '.\\LOG\\{}.pkl'.format(args.RECORD_NAME))
     f = open('.\\LOG\\{}.txt'.format(args.RECORD_NAME), 'a+')
@@ -80,6 +87,7 @@ def train(dataloader, model, optimizer, epoch):
     start_time = time.time()
     for batch_index, batch_samples in enumerate(dataloader):
         # 1.load data to CUDA
+        length = len(dataloader)
         x, y = batch_samples['x'].to(device), batch_samples['y'].to(device)  # x.size = (bs,C, len); y.size = (bs)
 
         # 2.forward

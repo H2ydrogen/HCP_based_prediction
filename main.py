@@ -8,7 +8,7 @@ import torch.backends.cudnn as cudnn
 import torch
 import torch.nn.functional as functional
 import numpy as np
-from DTI import models, dataset, cli, utils, analyse
+from DTI import models, dataset, cli, utils, analyse, visualizer
 import operator
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -16,10 +16,11 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 def main():
     utils.setup_seed(123)
     start_time = time.time()
+    vis = visualizer.Visualizer(args)
 
     # 数据集加载
-    train_set = dataset.CreateDataset(dataset.get_hcp_s1200(), usage='train')
-    val_set = dataset.CreateDataset(dataset.get_hcp_s1200(), usage='val')
+    train_set = dataset.CreateDataset(args, dataset.get_hcp_s1200(args), usage='train')
+    val_set = dataset.CreateDataset(args, dataset.get_hcp_s1200(args), usage='val')
     train_loader = DataLoader(train_set, batch_size=args.batch_size, drop_last=False, shuffle=True, pin_memory=True,
                               num_workers=args.num_workers)
     val_loader = DataLoader(val_set, batch_size=args.batch_size, drop_last=True, shuffle=True, pin_memory=True,
@@ -28,13 +29,17 @@ def main():
     # 网络加载
 
     if args.MODEL == '1D-CNN':
-        model = models.HARmodel(len(args.INPUT_FEATURES), args.NUM_CLASSES).to(device)
+        model = models.HARmodel(args).to(device)
+    elif args.MODEL == '2D-CNN':
+        model = models.CNN_2D(args).to(device)
+    elif args.MODEL == 'Lenet':
+        model = models.Lenet(args).to(device)
     else:
         model = None
 
     # if os.path.exists(args.LOAD_PATH):
     #     model.load_state_dict(torch.load(args.LOAD_PATH))
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.LR, weight_decay=0.01)
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.LR, weight_decay=args.L2)
 
     # 训练
     val_loss = []
@@ -66,8 +71,10 @@ def main():
         print('best train_loss；{}({}epoch)---best t_acc:{}({}epoch)---best val_acc；{}({}epoch),'
               .format(min_train_loss, min_train_loss_index+1, max_train_acc, max_train_acc_index+1, max_val_acc, max_val_acc_index+1,))
 
+        # 训练结果可视化
+        vis.display_train_result(train_results['train_loss']/100, train_results['train_acc'], val_results['val_acc'], epoch)
     # 训练结果存档
-    torch.save(model.state_dict(), '.\\LOG\\{}.pkl'.format(args.RECORD_NAME))
+    # torch.save(model.state_dict(), '.\\LOG\\{}.pkl'.format(args.RECORD_NAME))
     f = open('.\\LOG\\{}.txt'.format(args.RECORD_NAME), 'a+')
     f.writelines('args'+str(args)+'\n')
     f.writelines('train_loss'+str(train_loss)+'\n')

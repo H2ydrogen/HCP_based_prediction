@@ -6,13 +6,8 @@ from DTI.utils import read_csv, export
 import os
 import numpy as np
 import logging
-from PIL import Image
-import copy
-from DTI import cli
-import random
-import collections
+import math
 
-args = cli.create_parser().parse_args()
 LOG = logging.getLogger('dataset')
 
 
@@ -26,8 +21,8 @@ def count_list(alist):
 
 
 @export
-def get_hcp_s1200():
-    root_dir = args.data_path
+def get_hcp_s1200(opt):
+    root_dir = opt.data_path
     data = read_csv(os.path.join(root_dir, 'S1200_demographics_Restricted.csv'))
     data = [[line[0], line[1], line[8], line[10], line[12], line[22]] for line in data[1:]]
     # 0:subject, 1:Age, 8:Gender, 10:Race, 11:Ethnicity, 12:Handedness, 19:Height,  20:Weight, 22:BMICat
@@ -90,11 +85,12 @@ def get_hcp_s1200():
 # 装数据集的iterator的对象，可以不断next()出数据(x,y)
 @export
 class CreateDataset(Dataset):
-    def __init__(self, dataset, usage):
+    def __init__(self, opt, dataset, usage):
         self.root_dir = dataset['root_dir']
         self.data_list = dataset['data_list']
         self.transform = dataset['transform']
-        self.fold_number = args.FOLD_NUM
+        self.fold_number = opt.FOLD_NUM
+        self.opt = opt
         if usage == 'train':
             index = int(len(self.data_list) * (1.0 - 1.0 / self.fold_number))
             self.data_list = self.data_list[:index]
@@ -103,6 +99,31 @@ class CreateDataset(Dataset):
             self.data_list = self.data_list[index:]
 
         self.data_list = self.data_list
+        self.hemispheres = []
+        if 'right-hemisphere' in self.opt.HEMISPHERES:
+            self.hemispheres.append(-1)
+        if 'left-hemisphere' in self.opt.HEMISPHERES:
+            self.hemispheres.append(-2)
+        if 'commissural' in self.opt.HEMISPHERES:
+            self.hemispheres.append(-3)
+        if 'anatomical' in self.opt.HEMISPHERES:
+            self.hemispheres.append(-4)
+
+        self.features = []
+        if 'Num_Fibers' in self.opt.INPUT_FEATURES:
+            self.features.append(1)
+        if 'FA1-max' in self.opt.INPUT_FEATURES:  # row[9]
+            self.features.append(8)
+        if 'FA1-mean' in self.opt.INPUT_FEATURES: # row[10]
+            self.features.append(9)
+        if 'FA1-min' in self.opt.INPUT_FEATURES:  # row[12]
+            self.features.append(11)
+        if 'FA2-mean' in self.opt.INPUT_FEATURES:
+            self.features.append(15)
+        if 'Trace1-mean' in self.opt.INPUT_FEATURES:
+            self.features.append(27)
+        if 'Trace2-mean' in self.opt.INPUT_FEATURES:
+            self.features.append(33)
 
     def __len__(self):
         return len(self.data_list)
@@ -111,60 +132,55 @@ class CreateDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        data = []
-        # print('sample:'+self.data_list[idx][0]+'\t'+str(idx))
-        if 'right-hemisphere' in args.FEATURES_TYPE:
-            data.append(read_csv(self.data_list[idx][-1]))
-        if 'left-hemisphere' in args.FEATURES_TYPE:
-            data.append(read_csv(self.data_list[idx][-2]))
-        if 'commissural' in args.FEATURES_TYPE:
-            data.append(read_csv(self.data_list[idx][-3]))
-        if 'anatomical' in args.FEATURES_TYPE:
-            raise
+        # 读取idx对应文件，放入all_data
+        all_data = np.zeros(1)
+        for i in self.hemispheres:
+            raw_data = read_csv(self.data_list[idx][i])  # (801,39)
+            # 去除title，转换成np，维度标准化，data.shape=(38,800)
+            data = np.array([row[1:] for row in raw_data[1:]]).astype(np.float).transpose()
+            if i == -4:  # anatomical与其他不一样
+                data = np.concatenate((data[0:26, :], data[32:44, :]))
+            # 在dim=1连接所有数据
+            if all_data.any():
+                all_data = np.concatenate((all_data, data), axis=1)  # all_data.shape=(38,800*n)
+            else:
+                all_data = data
 
-        all_data = np.zeros((38, 1))
-        for element in data:
-            element = np.array([row[1:] for row in element[1:]]).astype(np.float).transpose()  # np.size()=(num_features,num_clu)
-            all_data = np.concatenate((all_data, element), axis=1)
-        all_data = all_data[:, 1:]
-        x = np.zeros((1, all_data.shape[1]))
+        # nan置0
+        all_data[np.isnan(all_data)] = 0
 
-        if 'Num_Fibers' in args.INPUT_FEATURES:
-            feature = all_data[1, :][None]
-            x = np.concatenate((x, feature))
-        if 'FA1-mean' in args.INPUT_FEATURES: # row[10]
-            x = np.concatenate((x, all_data[9, :][None]))
-        if 'FA1-max' in args.INPUT_FEATURES:  # row[9]
-            x = np.concatenate((x, all_data[8, :][None]))
-        if 'FA1-min' in args.INPUT_FEATURES:  # row[12]
-            x = np.concatenate((x, all_data[11, :][None]))
-        if 'FA2-mean' in args.INPUT_FEATURES:
-            x = np.concatenate((x, all_data[15, :][None]))
-        if 'Trace1-mean' in args.INPUT_FEATURES:
-            x = np.concatenate((x, all_data[27, :][None])) * 1000
-        if 'Trace2-mean' in args.INPUT_FEATURES:
-            x = np.concatenate((x, all_data[33, :][None])) * 1000
-        if 'Trace1-mean' in args.INPUT_FEATURES:
-            x = np.concatenate((x, all_data[27, :][None])) * 1000
-        if 'Trace2-mean' in args.INPUT_FEATURES:
-            x = np.concatenate((x, all_data[33, :][None])) * 1000
-        x = x[1:]
-        x[~(x > -999999)] = 0  # 将nan转换为0
-        max = x.max()
-        x = (x-x.min())/(x.max()-x.min())
+        # 从all_data中取出想要的特征,归一化，然后放入x
+        x = np.zeros(1)
+        for i in self.features:
+            feature = all_data[i, :][None]
+            feature = (feature - feature.min()) / (feature.max() - feature.min())
+            if x.any():
+                x = np.concatenate((x, feature))  # x(n,num_cls)
+                a = 0
+            else:
+                x = feature
 
-        # np->tensor, 数据normalization
+        # 转换为二维
+        if self.opt.MODEL == '2D-CNN' or self.opt.MODEL == 'Lenet':
+            dim0, dim1 = x.shape
+            size = math.ceil(dim1 ** 0.5)
+            x = np.concatenate((x, np.zeros((dim0, size**2 - dim1))), axis=1)
+            x = x.reshape((dim0, size, size))  # (n, size, size)
+
+        # np->tensor
         x = torch.from_numpy(x).float()
 
-        if args.OUTPUT_FEATURES == 'sex':
+        if self.opt.OUTPUT_FEATURES == 'sex':
             y = self.data_list[idx][2]
-        elif args.OUTPUT_FEATURES == 'race':
+        elif self.opt.OUTPUT_FEATURES == 'race':
             y = self.data_list[idx][3]
 
         return {
             'x': x,  # size:(1,num_features)
             'y': torch.tensor(y)
         }
+
+
 
 
 

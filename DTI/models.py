@@ -1,7 +1,17 @@
+import math
+
 from torchvision import models
 from torch import nn
 import torch.nn.functional as F
 import torch
+
+
+def Alexnet(opt):
+    model = models.alexnet(pretrained=True)
+    for param in model.parameters():
+        param.requires_grad = False
+    model.fc = nn.Linear(555, opt.NUM_CLASSES)
+    return model
 
 
 def ResNet50(classes, pretrained=True):
@@ -45,12 +55,17 @@ class CNN(nn.Module):
 class HARmodel(nn.Module):
     """Model for human-activity-recognition."""
 
-    def __init__(self, input_channel, num_classes):
+    def __init__(self, args):
         super().__init__()
-
+        self.opt = args
+        # 计算全连接层输入维度
+        input_len = len(self.opt.HEMISPHERES) * 800
+        if 'anatomical' in self.opt.HEMISPHERES:
+            input_len -= (800 - 57)
+        self.classifier_input_len = 64 * (input_len - 12)
         # Extract features, 1D conv layers
         self.features = nn.Sequential(
-            nn.Conv1d(input_channel, 64, 5),
+            nn.Conv1d(len(self.opt.INPUT_FEATURES), 64, 5),
             nn.BatchNorm1d(64, momentum=0.5),
             nn.ReLU(),
             nn.Dropout(),
@@ -65,11 +80,11 @@ class HARmodel(nn.Module):
         # Classify output, fully connected layers
         self.classifier = nn.Sequential(
             nn.Dropout(),
-            nn.Linear(50432, 128),
+            nn.Linear(self.classifier_input_len, 128),
             nn.BatchNorm1d(128, momentum=0.5),
             nn.ReLU(),
             nn.Dropout(),
-            nn.Linear(128, num_classes),
+            nn.Linear(128, self.opt.NUM_CLASSES),
         )
 
     def forward(self, x):
@@ -79,38 +94,83 @@ class HARmodel(nn.Module):
 
         return out
 
-# class CAM_CNN(nn.Module):
-#     """Model for human-activity-recognition."""
-#
-#     def __init__(self, input_channel, num_classes):
-#         super().__init__()
-#
-#         # Extract features, 1D conv layers
-#         self.features = nn.Sequential(
-#             nn.Conv1d(input_channel, 64, 5),
-#             nn.BatchNorm1d(64, momentum=0.5),
-#             nn.ReLU(),
-#             nn.Dropout(),
-#             nn.Conv1d(64, 64, 5),
-#             nn.BatchNorm1d(64, momentum=0.5),
-#             nn.ReLU(),
-#             nn.Dropout(),
-#             nn.BatchNorm1d(64, momentum=0.5),
-#             nn.Conv1d(64, 64, 5),
-#             nn.ReLU(),
-#         )
-#         # Classify output, fully connected layers
-#         self.classifier = nn.Sequential(
-#             nn.Linear(64, num_classes)
-#         )
-#
-#     def forward(self, x):
-#         P = nn.AdaptiveAvgPool1d(1)
-#         L = nn.Linear(64, 2)
-#         x = self.features(x)
-#         x = P(x)
-#         x = x.squeeze()
-#         x = self.classifier(x)
-#
-#         return x
+
+class CNN_2D(nn.Module):
+    def __init__(self, opt):
+        '''构造函数，定义网络的结构'''
+        super().__init__()
+        self.opt = opt
+        input_len = 800 * len(self.opt.HEMISPHERES)
+        if 'anatomical' in self.opt.HEMISPHERES:
+            input_len -= (800 - 57)
+        input_len = math.ceil(input_len**0.5)
+        self.classifier_input_len = 64*(input_len-12)**2
+
+        self.features = nn.Sequential(
+            nn.Conv2d(len(self.opt.INPUT_FEATURES), 64, 5),
+            nn.BatchNorm2d(64, momentum=0.5),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Conv2d(64, 64, 5),
+            nn.BatchNorm2d(64, momentum=0.5),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.BatchNorm2d(64, momentum=0.5),
+            nn.Conv2d(64, 64, 5),
+            nn.ReLU(),
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(self.classifier_input_len, 128),
+            nn.BatchNorm1d(128, momentum=0.5),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(128, self.opt.NUM_CLASSES),
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        out = self.classifier(x)
+        return out
+
+
+class Lenet(nn.Module):
+    def __init__(self, opt):
+        '''构造函数，定义网络的结构'''
+        super().__init__()
+        self.opt = opt
+        input_len = 800 * len(self.opt.HEMISPHERES)
+        if 'anatomical' in self.opt.HEMISPHERES:
+            input_len -= (800 - 57)
+        input_len = math.ceil(input_len**0.5)
+        self.classifier_input_len = 64*(input_len-12)**2
+
+        self.features = nn.Sequential(
+            nn.Conv2d(len(self.opt.INPUT_FEATURES), 6, 5, padding=3),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2)),
+            nn.Conv2d(6, 16, 5),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2)),
+            nn.BatchNorm2d(16, momentum=0.5),
+            nn.Conv2d(16, 120, 5),
+            nn.ReLU(),
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(120, 84),
+            nn.BatchNorm1d(84, momentum=0.5),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(84, self.opt.NUM_CLASSES),
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        out = self.classifier(x)
+        return out
 

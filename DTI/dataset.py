@@ -29,14 +29,7 @@ def get_hcp_s1200(opt):
 
     # classify some of the data
     for i in range(len(data)):
-        if int(data[i][1]) <= 21:
-            data[i][1] = 0
-        elif int(data[i][1]) <= 25:
-            data[i][1] = 1
-        elif int(data[i][1]) <= 30:
-            data[i][1] = 2
-        elif int(data[i][1]) <= 37:
-            data[i][1] = 3
+        data[i][1] = int(data[i][1])
         if data[i][2] == 'M':
             data[i][2] = 0
         elif data[i][2] == 'F':
@@ -170,18 +163,17 @@ class CreateDataset(Dataset):
         # np->tensor
         x = torch.from_numpy(x).float()
 
-        if self.opt.OUTPUT_FEATURES == 'sex':
+        if self.opt.target == 'sex':
             y = self.data_list[idx][2]
-        elif self.opt.OUTPUT_FEATURES == 'race':
+        elif self.opt.target == 'race':
             y = self.data_list[idx][3]
+        elif self.opt.target == 'age':
+            y = self.data_list[idx][1]
 
         return {
             'x': x,  # size:(1,num_features)
-            'y': torch.tensor(y)
+            'y': torch.tensor(y).float()
         }
-
-
-
 
 
 # 判断一个字符串是否为数字
